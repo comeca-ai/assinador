@@ -33,4 +33,24 @@ Veja `ADS.md`. Nenhuma campanha ou rastreamento está ativo.
 
 ## GitHub Pages
 
-`docs/` contém uma demonstração estática independente. O workflow `.github/workflows/pages.yml` publica somente essa pasta, sem banco de dados, servidor, documentos ou formulários de cadastro. Em Settings → Pages, selecione GitHub Actions como origem. O workflow executa em push para `main` e manualmente. GitHub Pages não executa `server.py`; o sistema de assinatura requer hospedagem de backend separada.
+`docs/` contém a demonstração estática. A publicação ativa usa a branch `gh-pages`, pasta `/ (root)`, em Settings → Pages → Deploy from a branch. O workflow alternativo está disponível somente para execução manual e não é necessário para esse modo. Alterações em `docs/` precisam ser enviadas também à branch `gh-pages`. GitHub Pages não executa `server.py`; o sistema de assinatura requer hospedagem separada.
+
+## Preparação para hospedagem do sistema
+
+O servidor deve servir a interface e a API na mesma origem HTTPS; assim não é necessário expor cookies entre GitHub Pages e outro domínio. A demonstração do Pages pode posteriormente apontar para esse endereço. Não foi escolhido nem contratado um provedor.
+
+Requisitos: Python 3.12+, um único serviço com volume persistente local para SQLite, HTTPS no proxy, cookies Secure e armazenamento/backup protegidos. Evite disco efêmero e múltiplas réplicas com bancos locais independentes. Não publique o servidor HTTP de desenvolvimento diretamente; é necessário preparar o runtime e o proxy compatíveis com o provedor escolhido.
+
+Variáveis não secretas: `ASSINAJA_DATA_DIR` deve apontar para o volume; `ASSINAJA_SECURE_COOKIES=1` em HTTPS. O proxy deve preservar o Host público para as verificações de origem. A rota `/healthz` verifica acesso ao banco e retorna `{"status":"ok"}`. Ela não certifica durabilidade de disco ou prontidão para produção.
+
+### Backup e recuperação
+
+```sh
+python3 scripts/backup.py .local/assinaja.sqlite3 /caminho-protegido/backup-UNICO.sqlite3
+```
+
+O utilitário usa o mecanismo de backup do SQLite, verifica integridade e não sobrescreve arquivos existentes. O backup inclui PDFs, dados pessoais e sessões; nunca o coloque em `docs/`, no Git ou em pasta pública. Copie-o para armazenamento protegido externo ao servidor, com retenção definida. Para restaurar, pare o serviço, preserve o banco atual, valide o backup e copie-o para `ASSINAJA_DATA_DIR/assinaja.sqlite3` com acesso restrito antes de reiniciar. Não há automação de backup externo ou restauração de produção configurada.
+
+## Cloudflare
+
+A versão Workers + D1 + R2 está em `cloudflare/`, com configuração Wrangler e testes locais. Consulte [CLOUDFLARE.md](CLOUDFLARE.md) para arquitetura, validação, limites e sequência de implantação. O backend Python continua disponível como alternativa local. Nenhum recurso remoto foi criado.

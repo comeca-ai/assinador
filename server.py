@@ -42,6 +42,9 @@ class Handler(BaseHTTPRequestHandler):
         path=urlparse(self.path).path
         with db() as c:
             user=self.user(c)
+            if path=='/healthz':
+                c.execute('SELECT 1').fetchone()
+                return self.send(200,{'status':'ok'})
             if path=='/api/me': return self.send(200,dict(user) if user else None)
             if path=='/api/documents':
                 if not user: return self.send(401,{'error':'Entre na sua conta.'})
@@ -69,8 +72,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get('Content-Type','').split(';')[0]!='application/json': return self.send(415,{'error':'Use JSON.'})
         try:
             size=int(self.headers.get('Content-Length','0'))
+            if size<=0: return self.send(400,{'error':'Corpo JSON obrigatório.'})
             if size>15_000_000: return self.send(413,{'error':'PDF deve ter até 10 MB.'})
             data=json.loads(self.rfile.read(size)); path=urlparse(self.path).path
+            if not isinstance(data,dict): return self.send(400,{'error':'Envie um objeto JSON.'})
             with db() as c:
                 user=self.user(c)
                 if path in ['/api/register','/api/login']:
@@ -88,10 +93,12 @@ class Handler(BaseHTTPRequestHandler):
                         uid=u['id']
                     sid=secrets.token_urlsafe(32); c.execute('INSERT INTO sessions VALUES(?,?,?)',(sid,uid,int(time.time())+86400))
                     secure='; Secure' if os.getenv('ASSINAJA_SECURE_COOKIES')=='1' else ''
+                    c.commit()
                     return self.send(200,{'ok':True},cookie=f'session={sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400{secure}')
                 if path=='/api/logout':
                     cookie=SimpleCookie(); cookie.load(self.headers.get('Cookie',''))
                     if cookie.get('session'): c.execute('DELETE FROM sessions WHERE id=?',(cookie['session'].value,))
+                    c.commit()
                     return self.send(200,{'ok':True},cookie='session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
                 if path=='/api/documents':
                     if not user: return self.send(401,{'error':'Entre na sua conta.'})
@@ -101,7 +108,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not pdf.startswith(b'%PDF-') or len(pdf)>10_000_000: return self.send(400,{'error':'Envie um PDF de até 10 MB.'})
                     did=secrets.token_hex(16); token=secrets.token_urlsafe(32)
                     c.execute('INSERT INTO documents(id,owner,title,filename,pdf,sha256,recipient,token,created) VALUES(?,?,?,?,?,?,?,?,?)',(did,user['id'],title,'documento.pdf',pdf,hashlib.sha256(pdf).hexdigest(),recipient,token,int(time.time())))
-                    record(c,did,'created'); return self.send(201,{'id':did,'token':token})
+                    record(c,did,'created'); c.commit(); return self.send(201,{'id':did,'token':token})
                 if path.startswith('/api/sign/'):
                     token=path.split('/')[-1]; name=str(data.get('name','')).strip()[:150]
                     if data.get('consent') is not True or len(name)<3: return self.send(400,{'error':'Informe seu nome e aceite os termos.'})
@@ -111,6 +118,7 @@ class Handler(BaseHTTPRequestHandler):
                     if d['signed']: return self.send(409,{'error':'Documento já assinado.'})
                     c.execute('UPDATE documents SET signed=?,signer=?,ip=?,user_agent=? WHERE id=?',(int(time.time()),name,self.client_address[0],self.headers.get('User-Agent','')[:500],d['id']))
                     record(c,d['id'],'signed','Aceite expresso e nome informado pelo portador do link; identidade não verificada.')
+                    c.commit()
                     return self.send(200,{'ok':True})
                 return self.send(404,{'error':'Não encontrado.'})
         except (ValueError,TypeError,KeyError): return self.send(400,{'error':'Dados inválidos.'})

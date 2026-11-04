@@ -1,0 +1,1 @@
+{"name":"assinaja","private":true,"version":"0.1.0","type":"module","scripts":{"dev:cloudflare":"wrangler dev","check:cloudflare":"wrangler deploy --dry-run --outdir .local/worker-build","test:cloudflare":"node --test tests/worker.test.js"},"devDependencies":{"wrangler":"4.157.0"}}
