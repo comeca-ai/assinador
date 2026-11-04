@@ -1,0 +1,7 @@
+*
+!server.py
+!public/
+!public/**
+!deploy/
+!deploy/railway_start.py
+!Dockerfile

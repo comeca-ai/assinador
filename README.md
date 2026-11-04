@@ -54,3 +54,7 @@ O utilitário usa o mecanismo de backup do SQLite, verifica integridade e não s
 ## Cloudflare
 
 A versão Workers + D1 + R2 está em `cloudflare/`, com configuração Wrangler e testes locais. Consulte [CLOUDFLARE.md](CLOUDFLARE.md) para arquitetura, validação, limites e sequência de implantação. O backend Python continua disponível como alternativa local. Nenhum recurso remoto foi criado.
+
+## Railway
+
+A alternativa Docker/Python com volume persistente está preparada em [RAILWAY.md](RAILWAY.md). Não usa o backend Cloudflare nem créditos GitHub Actions. É um piloto e ainda requer os controles de produção listados acima. A implantação depende de conta Railway e volume em `/data`; nenhum recurso remoto foi criado automaticamente.
